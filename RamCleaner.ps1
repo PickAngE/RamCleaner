@@ -24,10 +24,10 @@ function Get-ProcessStats {
         try { $path = $p.MainModule.FileName } catch { }
         
         [PSCustomObject]@{
-            Id          = $p.Id
-            ProcessName = $p.ProcessName
-            MemoryMB    = [math]::Round($p.WorkingSet64 / 1MB, 2)
-            Path        = $path
+            Id            = $p.Id
+            ProcessName   = $p.ProcessName
+            "Memory (MB)" = "{0:N2} MB" -f ($p.WorkingSet64 / 1MB)
+            Path          = $path
         }
     }
     return $stats
@@ -56,7 +56,6 @@ while ($true) {
     $status = if ($isAdmin) { "ELEVATED" } else { "STANDARD" }
     $color = if ($isAdmin) { "Green" } else { "Yellow" }
     
-    
     $InputTarget = Read-Host "Input Target (PID or Process Name / 'q' to quit)"
     
     if ([string]::IsNullOrWhiteSpace($InputTarget) -or $InputTarget -eq 'q') { break }
@@ -75,14 +74,14 @@ while ($true) {
         try { $TargetPath = $InitialProcess.MainModule.FileName } catch { }
         
         $RelatedProcesses = Get-Process -Name $TargetName | Where-Object {
-            if ($TargetPath -and $_.MainModule.FileName) {
-                try { return $_.MainModule.FileName -eq $TargetPath } catch { return $true }
-            }
-            return $true
+            if (-not $TargetPath) { return $true }
+            $currPath = $null
+            try { $currPath = $_.MainModule.FileName } catch { }
+            return (-not $currPath -or ($currPath -eq $TargetPath))
         }
 
         $Stats = Get-ProcessStats -ProcessList $RelatedProcesses
-        $TotalBefore = ($Stats | Measure-Object -Property MemoryMB -Sum).Sum
+        $TotalBefore = ($RelatedProcesses | Measure-Object -Property WorkingSet64 -Sum).Sum / 1MB
 
         Write-Host "`nTarget Context:" -ForegroundColor Cyan
         Write-Host "  Name  : $($TargetName.ToUpper())"
